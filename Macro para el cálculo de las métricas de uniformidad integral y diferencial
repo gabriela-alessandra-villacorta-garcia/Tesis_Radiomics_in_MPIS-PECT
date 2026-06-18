@@ -1,0 +1,69 @@
+// ============================================================
+// MACRO: Uniformidad Integral y Diferencial (SPECT QC)
+// Para imágenes de flood field crudas o corregidas
+// Calcula ambas métricas en un solo clic sobre el ROI seleccionado
+// Ventana deslizante: 5x5 píxeles (ajustable)
+// ============================================================
+
+macro "Uniformidad Integral y Diferencial [F1]" {
+
+    // Verificación de que existe un ROI seleccionado
+    if (selectionType() == -1) {
+        exit("Error: Primero selecciona un ROI rectangular (UFOV o CFOV)");
+    }
+
+    titulo = getTitle();
+    run("Duplicate...", "title=Temp_ROI");
+
+    ancho = getWidth();
+    alto = getHeight();
+
+    // =====================================================
+    // 1. CÁLCULO DE UNIFORMIDAD INTEGRAL (sobre todo el ROI)
+    // =====================================================
+    getRawStatistics(nPixels, mean, min, max, std, histogram);
+
+    if ((max + min) > 0) {
+        UI = (max - min) / (max + min) * 100;
+    } else {
+        UI = 0;
+    }
+
+    // =====================================================
+    // 2. CÁLCULO DE UNIFORMIDAD DIFERENCIAL 
+    // =====================================================
+    tamano_ventana = 5;
+    max_UD = 0;
+    contador = 0;
+
+    for (y = 0; y <= alto - tamano_ventana; y++) {
+        for (x = 0; x <= ancho - tamano_ventana; x++) {
+            makeRectangle(x, y, tamano_ventana, tamano_ventana);
+            getRawStatistics(nPixels, mean, min, max, std, histogram);
+
+            if ((max + min) > 0) {
+                UD_local = (max - min) / (max + min) * 100;
+                if (UD_local > max_UD) {
+                    max_UD = UD_local;
+                }
+            }
+            contador++;
+        }
+        showProgress(y, alto);
+    }
+
+    // =====================================================
+    // 3. MOSTRAR RESULTADOS
+    // =====================================================
+    print("======================================================");
+    print("Imagen analizada: " + titulo);
+    print("------------------------------------------------------");
+    print("UNIFORMIDAD INTEGRAL (ROI completo): " + d2s(UI, 2) + " %");
+    print("UNIFORMIDAD DIFERENCIAL (ventana 5x5): " + d2s(max_UD, 2) + " %");
+    print("------------------------------------------------------");
+    print("Tamaño de ventana diferencial: " + tamano_ventana + "x" + tamano_ventana + " píxeles");
+    print("Total de ventanas analizadas: " + contador);
+    print("======================================================");
+
+    close("Temp_ROI");
+}
